@@ -1,4 +1,4 @@
-const { exec } = require("child-process");
+const { exec } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
@@ -24,19 +24,20 @@ async function init() {
     console.log(data.toString());
   });
 
-  p.stdout.on("data", (data) => {
+  p.stdout.on("error", (data) => {
     console.error(data.toString());
   });
 
   p.on("close", async () => {
     console.log("Build completed");
     const distFolderPath = path.join(__dirname, "output", "dist");
-
-    const distFolderContent = fs.readdirSync(distFolderPath, {
+    const distFolderContents = fs.readdirSync(distFolderPath, {
       recursive: true,
     });
 
-    for (const file of distFolderContent) {
+    console.log("Starting Upload");
+
+    for (const file of distFolderContents) {
       const filePath = path.join(distFolderPath, file);
 
       if (fs.lstatSync(filePath).isDirectory()) continue;
@@ -45,9 +46,9 @@ async function init() {
 
       const command = new PutObjectCommand({
         Bucket: "simple-vercel-output",
-        Key: `__output/${PROJECT_ID}/${filePath}`,
-        Body: fs.createReadStream(file),
-        ContentType: mime.lookup(filePath)
+        Key: `__outputs/${PROJECT_ID}/${file}`,
+        Body: fs.createReadStream(filePath),
+        ContentType: mime.lookup(filePath),
       });
 
       await s3Client.send(command);
