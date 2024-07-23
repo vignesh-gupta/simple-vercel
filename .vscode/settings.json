@@ -1,5 +1,9 @@
 {
   "conventionalCommits.scopes": [
-    "build-server"
+    "build-server",
+    "api-server"
+  ],
+  "cSpell.words": [
+    "awsvpc"
   ]
 }
