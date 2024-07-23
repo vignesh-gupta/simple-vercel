@@ -19,10 +19,8 @@ app.use((req, res) => {
 
 proxy.on("proxyReq", (proxyReq, req, res) => {
   const url = req.url;
-  // console.log("url", url);
   if (url === "/") proxyReq.path += "index.html";
-
   return proxyReq;
 });
 
-app.listen(PORT, () => console.log(`Server is running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Reverse Proxy Server is running on port ${PORT}`));

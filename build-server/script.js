@@ -31,6 +31,9 @@ async function init() {
   p.on("close", async () => {
     console.log("Build completed");
     const distFolderPath = path.join(__dirname, "output", "dist");
+
+    console.log("Reading dist folder", distFolderPath);
+
     const distFolderContents = fs.readdirSync(distFolderPath, {
       recursive: true,
     });
