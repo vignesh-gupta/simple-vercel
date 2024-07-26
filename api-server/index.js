@@ -1,25 +1,25 @@
 const express = require("express");
-const { ECSClient, RunTaskCommand } = require("@aws-sdk/client-ecs");
+const { RunTaskCommand } = require("@aws-sdk/client-ecs");
 const { generateSlug } = require("random-word-slugs");
+const { runTask, ESC_CONFIG, subscriber } = require("./config");
+const { Server } = require("socket.io");
 
 const PORT = process.env.PORT || 9000;
-
 const app = express();
 
-app.use(express.json());
+const io = new Server({ cors: "*" });
 
-const ecsClient = new ECSClient({
-  region: "ap-south-1",
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY,
-    secretAccessKey: process.env.AWS_SECRET_KEY,
-  },
+io.on("connection", (socket) => {
+  socket.on("subscribe", (channel) => {
+    console.log("Subscribing to channel", channel);
+    socket.join(channel);
+    socket.emit("message", `Joined ${channel}`);
+  });
 });
 
-const config = {
-  CLUSTER: "arn:aws:ecs:ap-south-1:536270426756:cluster/build-cluster",
-  TASK: "arn:aws:ecs:ap-south-1:536270426756:task-definition/builder-task",
-};
+io.listen(9001, () => console.log("Socket server is running on port 9001"));
+
+app.use(express.json());
 
 app.post("/project", async (req, res) => {
   const { gitURL, slug } = req.body;
@@ -28,19 +28,15 @@ app.post("/project", async (req, res) => {
   console.log("Spinning up a container for project", projectSlug);
 
   const command = new RunTaskCommand({
-    cluster: config.CLUSTER,
-    taskDefinition: config.TASK,
+    cluster: ESC_CONFIG.CLUSTER,
+    taskDefinition: ESC_CONFIG.TASK,
     launchType: "FARGATE",
     count: 1,
     networkConfiguration: {
       awsvpcConfiguration: {
-        subnets: [
-          "subnet-0e58acfb5a291296b",
-          "subnet-083ddaffd5aeef48b",
-          "subnet-0fc359a13c236a2e0",
-        ],
+        subnets: ESC_CONFIG.VPC_SUBNETS,
         assignPublicIp: "ENABLED",
-        securityGroups: ["sg-0b7c0b978cc3b8e89"],
+        securityGroups: ESC_CONFIG.SECURITY_GROUPS,
       },
     },
     overrides: {
@@ -57,6 +53,10 @@ app.post("/project", async (req, res) => {
               value: process.env.AWS_SECRET_KEY,
             },
             {
+              name: "REDIS_URL",
+              value: process.env.REDIS_URL,
+            },
+            {
               name: "GIT_REPOSITORY__URL",
               value: gitURL,
             },
@@ -70,8 +70,7 @@ app.post("/project", async (req, res) => {
     },
   });
 
-  await ecsClient.send(command);
-  
+  await runTask(command);
 
   return res.json({
     status: "QUEUED",
@@ -81,5 +80,15 @@ app.post("/project", async (req, res) => {
     },
   });
 });
+
+async function initRedisSubscribe() {
+  console.log("Subscribed to logs....");
+  subscriber.psubscribe("logs:*");
+  subscriber.on("pmessage", (_, channel, message) => {
+    io.to(channel).emit("message", message);
+  });
+}
+
+initRedisSubscribe();
 
 app.listen(PORT, () => console.log(`API server is running on port ${PORT}`));
