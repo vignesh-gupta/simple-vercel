@@ -20,6 +20,7 @@ async function init() {
   });
 
   p.stdout.on("error", (data) => {
+    console.error(data.toString());
     publishLog("Error: " + data.toString());
   });
 
